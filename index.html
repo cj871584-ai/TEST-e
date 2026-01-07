@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>數學物語：無限的教室 (音樂增強版)</title>
+    <style>
+        :root {
+            --primary-bg: #2c3e50;
+            --box-bg: rgba(0, 0, 0, 0.85);
+            --text-color: #ffffff;
+            --accent: #f1c40f;
+        }
+
+        body {
+            font-family: 'Segoe UI', "Microsoft JhengHei", sans-serif;
+            background-color: #1a1a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        #game-container {
+            width: 100vw;
+            height: 100vh;
+            max-width: 1024px;
+            max-height: 768px;
+            position: relative;
+            background: #444;
+            border: 4px solid #333;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+            overflow: hidden;
+        }
+
+        /* 教室背景 */
+        #background {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: 
+                linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.2)),
+                url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600"><rect width="800" height="600" fill="%23dcdde1"/><rect x="100" y="100" width="600" height="300" fill="%232f3640" stroke="%2384817a" stroke-width="10"/><rect x="0" y="450" width="800" height="150" fill="%237158e2" opacity="0.2"/><line x1="0" y1="450" x2="800" y2="450" stroke="%2384817a" stroke-width="5"/></svg>');
+            background-size: cover;
+            z-index: 1;
+        }
+
+        /* 音樂控制面板 */
+        #audio-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 300;
+            background: rgba(0,0,0,0.6);
+            padding: 10px;
+            border-radius: 30px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: white;
+            border: 1px solid var(--accent);
+        }
+
+        .audio-btn {
+            background: none;
+            border: none;
+            color: var(--accent);
+            cursor: pointer;
+            font-size: 1.2rem;
+            outline: none;
+        }
+
+        /* 立繪容器 */
+        .character-container {
+            position: absolute;
+            bottom: 120px;
+            width: 100%;
+            height: 70%;
+            display: flex;
+            justify-content: space-around;
+            align-items: flex-end;
+            z-index: 2;
+            padding: 0 50px;
+            box-sizing: border-box;
+        }
+
+        .sprite {
+            width: 250px;
+            height: 450px;
+            transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            filter: brightness(0.4) grayscale(0.5);
+            transform: translateY(50px);
+            opacity: 0;
+        }
+
+        .sprite.active {
+            filter: brightness(1) grayscale(0);
+            transform: translateY(0) scale(1.05);
+            opacity: 1;
+            z-index: 10;
+        }
+
+        .sprite.visible {
+            opacity: 1;
+        }
+
+        /* 對話框樣式 */
+        #ui-layer {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 180px;
+            background: var(--box-bg);
+            border-top: 4px solid var(--accent);
+            z-index: 100;
+            padding: 25px;
+            box-sizing: border-box;
+            color: var(--text-color);
+            cursor: pointer;
+        }
+
+        #speaker-name {
+            font-size: 1.4rem;
+            color: var(--accent);
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        #dialogue-content {
+            font-size: 1.2rem;
+            line-height: 1.6;
+        }
+
+        /* 選項與按鈕 */
+        #choice-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            gap: 20px;
+        }
+
+        .choice-btn {
+            width: 60%;
+            padding: 18px;
+            background: white;
+            color: #2c3e50;
+            border-radius: 50px;
+            text-align: center;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.3s;
+            border: 3px solid var(--accent);
+            font-size: 1.1rem;
+        }
+
+        .choice-btn:hover {
+            transform: scale(1.05);
+            background: var(--accent);
+            color: white;
+        }
+
+        #next-indicator {
+            position: absolute;
+            bottom: 20px;
+            right: 30px;
+            font-size: 0.9rem;
+            color: var(--accent);
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink { 50% { opacity: 0; } }
+        
+        .ending-tag {
+            font-size: 1.8rem;
+            color: var(--accent);
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+<audio id="bgm" loop>
+    <source src="https://www.chosic.com/wp-content/uploads/2021/04/Warm-Light.mp3" type="audio/mpeg">
+</audio>
+
+<div id="game-container">
+    <div id="background"></div>
+    
+    <div id="audio-controls">
+        <button id="mute-btn" class="audio-btn" onclick="gameLogic.toggleMute()">🔊</button>
+        <span style="font-size: 0.8rem;">BGM: On</span>
+    </div>
+    
+    <div class="character-container">
+        <svg id="sprite-teacher" class="sprite" viewBox="0 0 200 400">
+            <rect x="60" y="80" width="80" height="85" fill="#e74c3c" rx="5" /> <rect x="40" y="170" width="120" height="230" fill="#c0392b" /> <rect x="92" y="170" width="16" height="80" fill="#fff" opacity="0.9" /> <circle cx="85" cy="115" r="4" fill="black"/> <circle cx="115" cy="115" r="4" fill="black"/>
+        </svg>
+
+        <svg id="sprite-studentA" class="sprite" viewBox="0 0 200 400">
+            <circle cx="100" cy="110" r="45" fill="#3498db" /> <rect x="55" y="160" width="90" height="240" fill="#2980b9" rx="20" /> <path d="M 85 130 Q 100 145 115 130" stroke="white" stroke-width="3" fill="none" /> </svg>
+
+        <svg id="sprite-studentB" class="sprite" viewBox="0 0 200 400">
+            <circle cx="100" cy="110" r="45" fill="#2ecc71" /> <rect x="65" y="160" width="70" height="240" fill="#27ae60" rx="10" /> <line x1="85" y1="110" x2="95" y2="110" stroke="#111" stroke-width="2"/> <line x1="105" y1="110" x2="115" y2="110" stroke="#111" stroke-width="2"/>
+        </svg>
+    </div>
+
+    <div id="choice-overlay"></div>
+
+    <div id="ui-layer" onclick="gameLogic.next()">
+        <div id="speaker-name">系統</div>
+        <div id="dialogue-content">（環境音：悠揚的校園午後）<br>點擊畫面開始數學課...</div>
+        <div id="next-indicator">NEXT ▶</div>
+    </div>
+</div>
+
+<script>
+    let playerCorrect = false;
+    let musicStarted = false;
+
+    const gameScript = [
+        { speaker: '數學老師', text: '（輕敲黑板）各位同學，今天我們來談談「無限」與「極限」。', active: 'teacher' },
+        { speaker: '學生甲', text: '無限？是那個像倒下來的 8 的符號嗎？感覺好玄喔！', active: 'studentA' },
+        { speaker: '數學老師', text: '呵呵，沒錯。但數學不只是符號。想像你有一塊披薩...', active: 'teacher' },
+        { speaker: '數學老師', text: '如果你每次吃掉剩下的一半，再吃掉剩下的一半... 這樣無限循環，你最後真的能把它「吃完」嗎？', active: 'teacher', hasChoices: true },
+        
+        { id: 'wrong_path', speaker: '數學老師', text: '可惜，在純粹的數學定義中，只要你每次都只吃「一半」，剩餘量就永遠不會歸零。', active: 'teacher' },
+        { id: 'wrong_path', speaker: '學生甲', text: '所以我就算吃了一萬年，還是會剩下一點點分子？這太不符合胃口了！', active: 'studentA' },
+        
+        { id: 'right_path', speaker: '數學老師', text: '正確！這就是「收斂」的概念，它無限趨近於 0，但永遠不等於 0。', active: 'teacher' },
+        { id: 'right_path', speaker: '學生乙', text: '這種永不交會的關係，聽起來竟然有點浪漫。', active: 'studentB' },
+        
+        { speaker: '數學老師', text: '無限大與無限小，是通往高深數學的門票。今天的課就到這裡。', active: 'teacher' },
+        { id: 'end_entry', isEnding: true }
+    ];
+
+    const gameLogic = {
+        index: -1,
+        bgm: document.getElementById('bgm'),
+        sprites: {
+            teacher: document.getElementById('sprite-teacher'),
+            studentA: document.getElementById('sprite-studentA'),
+            studentB: document.getElementById('sprite-studentB')
+        },
+
+        toggleMute() {
+            this.bgm.muted = !this.bgm.muted;
+            document.getElementById('mute-btn').textContent = this.bgm.muted ? "🔇" : "🔊";
+        },
+
+        startMusic() {
+            if (!musicStarted) {
+                this.bgm.play().catch(e => console.log("等待用戶交互以播放音樂"));
+                musicStarted = true;
+            }
+        },
+
+        next() {
+            this.startMusic(); // 第一次點擊時啟動音樂
+
+            if (document.getElementById('choice-overlay').style.display === 'flex') return;
+
+            this.index++;
+            let step = gameScript[this.index];
+
+            if (!step) return;
+
+            if (step.isEnding) {
+                this.showEnding();
+                return;
+            }
+
+            // 分支邏輯
+            if (step.id === 'wrong_path' && playerCorrect) { this.next(); return; }
+            if (step.id === 'right_path' && !playerCorrect) { this.next(); return; }
+
+            this.render(step);
+        },
+
+        render(step) {
+            document.getElementById('speaker-name').textContent = step.speaker;
+            document.getElementById('dialogue-content').textContent = step.text;
+
+            Object.values(this.sprites).forEach(s => s.classList.remove('active'));
+            if (this.sprites[step.active]) {
+                this.sprites[step.active].classList.add('active', 'visible');
+            }
+
+            if (step.hasChoices) {
+                this.showChoices();
+            }
+        },
+
+        showChoices() {
+            const overlay = document.getElementById('choice-overlay');
+            overlay.style.display = 'flex';
+            overlay.innerHTML = `
+                <div class="choice-btn" onclick="makeChoice(false)">肯定能吃完，只是時間問題！</div>
+                <div class="choice-btn" onclick="makeChoice(true)">永遠吃不完，最後會剩下極小的一點</div>
+            `;
+        },
+
+        makeChoice(correct) {
+            playerCorrect = correct;
+            document.getElementById('choice-overlay').style.display = 'none';
+            this.next();
+        },
+
+        showEnding() {
+            const title = playerCorrect ? "【結局：無限大師】" : "【結局：無限入門者】";
+            const desc = playerCorrect ? "你精準的邏輯思維讓老師印象深刻，或許你具備成為數學家的潛質。" : "雖然直覺上想把它吃完，但在數學世界裡，有時候「永遠到不了」才是真相。";
+            
+            document.getElementById('speaker-name').textContent = "系統通知";
+            document.getElementById('dialogue-content').innerHTML = `<span class="ending-tag">${title}</span><br>${desc}`;
+            document.getElementById('next-indicator').textContent = "再次挑戰 ↺";
+            document.getElementById('ui-layer').onclick = () => location.reload();
+        }
+    };
+
+    window.makeChoice = (val) => gameLogic.makeChoice(val);
+</script>
+
+</body>
+</html>
